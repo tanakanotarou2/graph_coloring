@@ -59,8 +59,8 @@ fn calc_avg_jisu(n: usize, d: f64) -> f64 {
 use average::Mean;
 use average::{MeanWithError, Estimate};
 fn main() {
-    let n = 100; // 頂点数
-    const AVG_JISU: f64 = 6.0; // 平均次数
+    let n = 1000; // 頂点数
+    const AVG_JISU: f64 = 10.0; // 平均次数
 
     let d;
     {
