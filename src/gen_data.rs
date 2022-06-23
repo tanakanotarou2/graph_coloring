@@ -1,20 +1,20 @@
 #![allow(non_snake_case, unused)]
 
-use std::cmp::min;
-use std::collections::HashMap;
-use rand::prelude::SliceRandom;
-use proconio::{*, marker::*};
-
-use std::fmt;
-use rand_pcg::Mcg128Xsl64;
-
-use std::io::prelude::*;
-use std::mem::swap;
-use std::time::Instant;
-use std::ops::{Index, IndexMut};
+use average::{Estimate, MeanWithError};
+use average::Mean;
 use itertools::{concat, Itertools};
 use petgraph::visit::Time;
+use proconio::{*, marker::*};
+use rand::prelude::SliceRandom;
 use rand::Rng;
+use rand_pcg::Mcg128Xsl64;
+use std::cmp::min;
+use std::collections::HashMap;
+use std::fmt;
+use std::io::prelude::*;
+use std::mem::swap;
+use std::ops::{Index, IndexMut};
+use std::time::Instant;
 
 
 /// 座標を表す構造体
@@ -56,11 +56,9 @@ fn calc_avg_jisu(n: usize, d: f64) -> f64 {
     (n as f64) * PI * d * d
 }
 
-use average::Mean;
-use average::{MeanWithError, Estimate};
 fn main() {
-    let n = 1000; // 頂点数
-    const AVG_JISU: f64 = 10.0; // 平均次数
+    let n = 3000; // 頂点数
+    const AVG_JISU: f64 = 100.0; // 平均次数
 
     let d;
     {
@@ -79,7 +77,7 @@ fn main() {
     }
 
     let (pos, edges) = gen_random_data(128, n, d);
-    println!("{} {}",n, edges.len());
+    println!("{} {}", n, edges.len());
     for e in edges.iter() {
         println!("{} {}", e.0, e.1);
     }

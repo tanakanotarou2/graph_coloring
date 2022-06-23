@@ -21,6 +21,29 @@ use rand::Rng;
 
 const EPS: f64 = 1e-9;
 
+
+/// chmin, chmax 関数
+pub trait SetMinMax {
+    fn chmin(&mut self, v: Self) -> bool;
+    fn chmax(&mut self, v: Self) -> bool;
+}
+
+impl<T> SetMinMax for T where T: PartialOrd {
+    fn chmin(&mut self, v: T) -> bool {
+        *self > v && {
+            *self = v;
+            true
+        }
+    }
+    fn chmax(&mut self, v: T) -> bool {
+        *self < v && {
+            *self = v;
+            true
+        }
+    }
+}
+
+
 #[derive(Clone, Debug)]
 pub struct Input {
     pub n: usize,
@@ -66,6 +89,7 @@ fn solver_SEQ(g: &Graph<(), (), Undirected>) -> Vec<usize> {
 }
 
 
+/// DSATUR による解法
 fn solver_DSATUR(g: &Graph<(), (), Undirected>) -> Vec<usize> {
     let n = g.node_count();
     let nodes = g.node_indices().collect_vec();
@@ -112,11 +136,82 @@ fn solver_DSATUR(g: &Graph<(), (), Undirected>) -> Vec<usize> {
     colors
 }
 
+
+fn solver_RLF(g: &Graph<(), (), Undirected>) -> Vec<usize> {
+    let n = g.node_count();
+    let nodes = g.node_indices().collect_vec();
+    let edge_cnt = (0..n).map(|i| { g.edges(nodes[i]).count() }).collect_vec();
+    let mut colors = vec![!0usize; n];
+
+    let mut no = 0;
+    loop {
+        // 色 no で塗れる頂点集合
+        let mut v_nodes = vec![];
+
+        // 未彩色頂点の取得
+        for i in 0..n {
+            if colors[i] == !0 {
+                let cnt = g.neighbors(nodes[i]).filter(|v| colors[v.index()] == !0).count();
+                v_nodes.push((i, cnt));
+            }
+        }
+        if v_nodes.len() == 0 { break; }
+
+        v_nodes.sort_by_key(|(_, cnt)| -(*cnt as i32));
+
+        // 集合 U
+        let mut u_st: HashSet<usize> = HashSet::new();
+        // 各頂点ごとの U に登録されている隣接頂点数
+        let mut nu_cnt = vec![0; n];
+
+        let mut v = v_nodes[0].0;
+        loop {
+            colors[v] = no;
+
+            // v の隣接頂点を 集合 U に登録
+            let tmp = g.neighbors(nodes[v]).filter(|v| colors[v.index()] == !0 && !u_st.contains(&(v.index()))).collect_vec();
+            for u in tmp {
+                u_st.insert(u.index());
+                for u2 in g.neighbors(u).filter(|v| colors[v.index()] == !0) {
+                    nu_cnt[u2.index()] += 1;
+                }
+            }
+
+            let mut nxt_nodes = vec![];
+            for (idx, cnt) in v_nodes.iter() {
+                if colors[*idx] == !0 && !u_st.contains(idx) {
+                    nxt_nodes.push((*idx, *cnt));
+                }
+            }
+            if nxt_nodes.len() == 0 {
+                break;
+            }
+
+            // 集合 U に含まれる隣接頂点が多いものを次の処理対象に
+            let mut nxt_v = !0usize;
+            let mut max_nucnt = -1;
+            for &(idx, cnt) in nxt_nodes.iter() {
+                if max_nucnt.chmax(nu_cnt[idx] as i32) {
+                    nxt_v = idx;
+                }
+            }
+            v = nxt_v;
+            v_nodes = nxt_nodes;
+        }
+        no += 1;
+    }
+    colors
+}
+
 fn validate(g: &Graph<(), (), Undirected>, colors: &Vec<usize>) -> bool {
     let n = g.node_count();
     let nodes = g.node_indices().collect_vec();
     for i in 1..n {
         let c = colors[i];
+        if c == !0 {
+            eprintln!("no color is assigned! node:{}", i);
+            return false;
+        }
         for v in g.neighbors(nodes[i]) {
             if colors[v.index()] == c {
                 eprintln!("nodes {} - {} are same color({})", i, v.index(), c);
@@ -137,12 +232,12 @@ fn get_result(colors: &Vec<usize>) -> usize {
 }
 
 fn main() {
-
+    // read input, build graph
     let input = parse_input();
     let mut g = Graph::<(), (), Undirected>::new_undirected();
     let nodes: Vec<_> = (0..input.n).map(|_| g.add_node(())).collect();
     g.extend_with_edges(input.edges.iter().map(|&x| (nodes[x.0], nodes[x.1])));
-
+    println!("total node:{} total edge:{}", input.n, g.edge_count());
 
     let res = solver_DSATUR(&g);
     // println!("{:?}", res);
@@ -153,18 +248,9 @@ fn main() {
     // println!("{:?}", res);
     validate(&g, &res);
     println!("color count: {:?}", get_result(&res));
-    println!("test {} {}", input.n, g.edge_count());
-    //
-    // assert_eq!((input.n, input.edges.len()), (g.node_count(), g.edge_count()));
 
-    // let n = g.node_count();
-    // let nodes =g.node_indices().collect_vec();
-    // for v in g.neighbors(nodes[0]){
-    //     println!("n, {:?}",v.index());
-    // }
-    // let a=ksm(10);
-    // let b=ksm(1002);
-    // let c = a^b;
-    // println!("{} {}",a,b);
-    // println!("{} {} {}",c^a,c^b,c^a^b);
+    let res = solver_RLF(&g);
+    // println!("{:?}", res);
+    validate(&g, &res);
+    println!("color count: {:?}", get_result(&res));
 }

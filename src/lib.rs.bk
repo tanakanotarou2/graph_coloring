@@ -1,5 +1,4 @@
 mod procon_utils;
-pub mod main;
 
 /**
  * vector 初期化
