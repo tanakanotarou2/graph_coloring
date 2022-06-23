@@ -44,6 +44,42 @@ impl<T> SetMinMax for T where T: PartialOrd {
 }
 
 
+pub struct Timer {
+    since: Instant,
+    duration: f64,
+}
+
+impl Timer {
+    fn new(duration: f64) -> Timer {
+        Timer {
+            since: Instant::now(),
+            duration,
+        }
+    }
+    fn t(&self) -> f64 {
+        (Instant::now() - self.since).as_secs_f64() * (1.0 / self.duration)
+    }
+
+    /*
+     * 経過時間取得(sec)
+     * 実行経過時間測定用
+     * 実行直後に1度コールする。2回目以降は1度目のコールからの経過時間を返す
+     *
+     */
+    fn get_time() -> f64 {
+        static mut STIME: f64 = -1.0;
+        let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+        let ms = t.as_secs() as f64 + t.subsec_nanos() as f64 * 1e-9;
+        unsafe {
+            if STIME < 0.0 {
+                STIME = ms;
+            }
+            ms - STIME
+        }
+    }
+}
+
+
 #[derive(Clone, Debug)]
 pub struct Input {
     pub n: usize,
@@ -137,13 +173,17 @@ fn solver_DSATUR(g: &Graph<(), (), Undirected>) -> Vec<usize> {
 }
 
 
+/// RLF の解法
 fn solver_RLF(g: &Graph<(), (), Undirected>) -> Vec<usize> {
     let n = g.node_count();
     let nodes = g.node_indices().collect_vec();
     let edge_cnt = (0..n).map(|i| { g.edges(nodes[i]).count() }).collect_vec();
     let mut colors = vec![!0usize; n];
 
-    let mut no = 0;
+    let mut no: i32 = 0;
+
+    // 集合 U の管理
+    let mut u_nodes = vec![-1; n];
     loop {
         // 色 no で塗れる頂点集合
         let mut v_nodes = vec![];
@@ -159,19 +199,17 @@ fn solver_RLF(g: &Graph<(), (), Undirected>) -> Vec<usize> {
 
         v_nodes.sort_by_key(|(_, cnt)| -(*cnt as i32));
 
-        // 集合 U
-        let mut u_st: HashSet<usize> = HashSet::new();
         // 各頂点ごとの U に登録されている隣接頂点数
         let mut nu_cnt = vec![0; n];
 
         let mut v = v_nodes[0].0;
         loop {
-            colors[v] = no;
+            colors[v] = no as usize;
 
             // v の隣接頂点を 集合 U に登録
-            let tmp = g.neighbors(nodes[v]).filter(|v| colors[v.index()] == !0 && !u_st.contains(&(v.index()))).collect_vec();
+            let tmp = g.neighbors(nodes[v]).filter(|v| colors[v.index()] == !0 && u_nodes[v.index()] < no).collect_vec();
             for u in tmp {
-                u_st.insert(u.index());
+                u_nodes[u.index()] = no;
                 for u2 in g.neighbors(u).filter(|v| colors[v.index()] == !0) {
                     nu_cnt[u2.index()] += 1;
                 }
@@ -179,7 +217,7 @@ fn solver_RLF(g: &Graph<(), (), Undirected>) -> Vec<usize> {
 
             let mut nxt_nodes = vec![];
             for (idx, cnt) in v_nodes.iter() {
-                if colors[*idx] == !0 && !u_st.contains(idx) {
+                if colors[*idx] == !0 && u_nodes[*idx] < no {
                     nxt_nodes.push((*idx, *cnt));
                 }
             }
@@ -239,18 +277,24 @@ fn main() {
     g.extend_with_edges(input.edges.iter().map(|&x| (nodes[x.0], nodes[x.1])));
     println!("total node:{} total edge:{}", input.n, g.edge_count());
 
-    let res = solver_DSATUR(&g);
-    // println!("{:?}", res);
-    validate(&g, &res);
-    println!("color count: {:?}", get_result(&res));
-
+    let mut t = Timer::get_time();
     let res = solver_SEQ(&g);
-    // println!("{:?}", res);
     validate(&g, &res);
-    println!("color count: {:?}", get_result(&res));
+    println!("SEQ color count: {:?}", get_result(&res));
+    println!("SEQ time: {:?}", Timer::get_time() - t);
+    println!();
 
-    let res = solver_RLF(&g);
-    // println!("{:?}", res);
+    let mut t = Timer::get_time();
+    let res = solver_DSATUR(&g);
     validate(&g, &res);
-    println!("color count: {:?}", get_result(&res));
+    println!("DSATUR color count: {:?}", get_result(&res));
+    println!("DSATUR time: {:?}", Timer::get_time() - t);
+    println!();
+
+    let mut t = Timer::get_time();
+    let res = solver_RLF(&g);
+    validate(&g, &res);
+    println!("RLF color count: {:?}", get_result(&res));
+    println!("RLF time: {:?}", Timer::get_time() - t);
+    println!();
 }
